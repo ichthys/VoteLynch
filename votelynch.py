@@ -16,7 +16,6 @@
 #
 
 import datetime
-import os
 import random
 import string
 import sys
@@ -300,6 +299,50 @@ class ManageGamePage(BaseRequestHandler):
             
         if not game.current_user_moderating():
             pass
+
+
+class CreateStageAction(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class ManageStagePage(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class CreateVotePage(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class CreateVoteAction(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class JoinGamePage(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class  JoinGameAction(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class PlayGamePage(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class VotePage(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class CastVoteAction(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+class  AddModeratorAction(BaseRequestHandler):
+    """placeholder"""
+    pass
+
+
+
         
 def main():
    application = webapp.WSGIApplication([
@@ -316,7 +359,7 @@ def main():
          #post - (name,password) to create game 
          #redirects to /managegame/?game=<newgameid>
 
-      ('/managegame', ManagePage),
+      ('/managegame', ManageGamePage),
          #/managegame/?game=<gameid>
          #displays state of game to moderator
             #links to create a next stage or create a vote for current stage
@@ -347,12 +390,15 @@ def main():
          #post - (gameid)    Creates a new vote in the current stage of the game
          # by default adds all alive players, moderators can remove from the manage page
          #redirects to /managevote/?vote=<voteid>
+
+
       ('/managevote', CreateVotePage),
          #/managevote/?vote=<voteid>
          #moderators view vote page
          #allows moderator to open and close voting
 
          #list_of_gamestageplayers (all alive)
+
       ('/join', JoinGamePage),
          #/join/?game=<gameid>
          #page for players to join the game. They will need the url from the moderator and the password
@@ -377,8 +423,9 @@ def main():
       ('/vote', VotePage),
          #/vote/?vote=<voteid>
          #Players view vote options to vote, or voting results
-
          #list_of_gamestageplayers
+
+
       ('/castvote.do', CastVoteAction),
          #post - (vote, choice)
             #choice is an id from list_of_gamestageplayers
