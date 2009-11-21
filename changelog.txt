@@ -1,5 +1,0 @@
-2009 november 20
-
-jpc - tried to get votelynch to at least load up without exploding; moved some stuff around, added some forward declarations, fixed some types (i.e. 'requred' instead of 'required')
-
-jpc - note that __main__ isn't calling main() right now, because that blows up, just wanted to see if i could get a clean load.  which sounds dirty.
