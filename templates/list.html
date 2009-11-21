@@ -1,0 +1,17 @@
+{%extends "base.html"%}
+{%block body%}
+<h2>My Votes</h2>
+
+List of Votes:
+<ul>
+{%for vote in votes%}
+<li>
+  <a href="{%url views.edit vote.key.id%}">{{vote.id}}</a>
+  - created {{vote.created|date:"Y/m/d H:i:s"}}
+  - <a href="{%url views.delete vote.id%}">[delete]</a>
+{%endfor%}
+</ul>
+
+<a href="{%url views.new%}">Create new vote</a>
+
+{%endblock%}

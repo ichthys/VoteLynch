@@ -1,0 +1,3 @@
+This is a rough outline for the templates and webpages that will be in the app:
+
+see votelynch.py.main()

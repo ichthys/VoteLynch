@@ -1,0 +1,25 @@
+{%extends "base.html"%}
+{%block body%}
+<h2>Create or Edit Vote</h2>
+
+{% if choices %}
+<form action="{%url views.edit vote.key.id%}" method="post">
+
+{% for choice in choices %}
+<input type="text" name="choice" value="{{choice.value}}" size="25"/></br />
+{% endfor %}
+
+<input type="submit" value="Save Changes">
+
+</form>
+{% endif %}
+
+<form name="input" action="{%url views.edit vote.key.id%}" method="get">
+
+Add <input type="text" name="new_choice" />
+<input type="submit" value="Submit" />
+
+</form> 
+
+
+{%endblock%}
