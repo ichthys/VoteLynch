@@ -35,7 +35,7 @@ template.register_template_library('templatefilters')
 _DEBUG = True
 
 
-## forward declarations (redefined later)
+# forward declarations (redefined later)
 class Game(db.Model):
    pass
 class Vote(db.Model):
@@ -342,53 +342,98 @@ class  AddModeratorAction(BaseRequestHandler):
     """placeholder"""
     pass
 
-
-
         
 def main():
    application = webapp.WSGIApplication([
       ('/', MainPage),
-         #Display games moderating and participaing. Links to create game
-
-         #list_of_games_playing
-         #list_of_games_moderating
+         """Display games moderating and participaing.
+         
+         Links:
+            create game
+         
+         Template variables:
+            list_of_games_playing
+            list_of_games_moderating
+         """
 
       ('/creategame', CreateGamePage),
-         #Page to create a game. Fields: (name, password)
+         """Page to create a game.
+         
+         Form fields:
+            name
+            password
+         """
 
       ('/creategame.do', CreateGameAction),
-         #post - (name,password) to create game 
-         #redirects to /managegame/?game=<newgameid>
+         """POST action to create game
+         
+         POST fields:
+            name
+            password
+               
+         Handler:
+            Creates new game
+            Redirects to /managegame/?game=<newgameid>
+         """
 
       ('/managegame', ManageGamePage),
-         #/managegame/?game=<gameid>
-         #displays state of game to moderator
-            #links to create a next stage or create a vote for current stage
+         """url: /managegame/?game=<gameid>
+         Displays state of game to moderator.
+          List of GameStagePlayers and isAlive status
+            
+         Links:
+            Create vote (/createvote/?game=<gameid>)
+            Next stage (/createstage/?game=<gameid>)
+            Linkes for template variable data
 
-         #information needed
-               #list_of_stages, currentstage, list_of_votes (for currentstage)
-               #(links on all of these)
-            #other links needed
-               #create new vote, create next stage
+         Template variables:
+            list_of_stages
+            list_of_votes (for current stage)
+            currentstage
+         """
       ('/createstage.do', CreateStageAction),
-         #post - (gameid)
+         """POST action to create stage
          
-         #creates a new stage for the current game
+         POST fields:
+            game
+             
+         Handler:
+            Creates new stage and new StageGamePlayer relationships for each player
+            redirects to /managestage/?stage=<stageid>
+         """
          
-         #redirects to /managestage/?stage=<stageid>
       ('/managestage', ManageStagePage),
-         #/managestage/?stage=<stageid>
+         """url: /managestage/?game=<gameid>
+         Page to start/manage stage of the game.
          
-         #lets moderators pick live players for stage
-         #Defaults to all players alive from previous stage
+         createstage.do redirects here after creating a new stage
+         The moderator must then pick the live players and start the stage
          
-         #Have a list of players with checkboxes.
-         #Each live player from previous stage checkbox is default to true
+         Stages will default to automate between day and night
+          but the moderator can choose to override that
+          (option box - Day/Night)
          
-         #list_of_stagegameplayers
-         
+         A list of players from the stage should be on the page
+          with a tick box next to their name. This is for the moderator
+          to select the players who died in the previous stage
+           (list of StageGamePlayers - tick boxes)
+           
+         Template Variables:
+            list_of_stagegameplayers
+            is_day (1 = day, 0 = night - defaults to correct value)
+          
+          
+         NOTE: This page may be deemed redundant. This information can all be on the 
+          manage game page. Moderator creates a new stage. All players are copied over
+          and before the moderator starts the new stage he can choose which players to
+          be alive. For now we'll leave these as seperate pages and merge them at a
+          later time
+         """
       ('/createvote.do', CreateVoteAction),
-         #post - (gameid)    Creates a new vote in the current stage of the game
+         """POST action to create a vote
+         url: /createvote.do/?game=<gameid>
+         
+         post - (gameid)    Creates a new vote in the current stage of the game
          # by default adds all alive players, moderators can remove from the manage page
          #redirects to /managevote/?vote=<voteid>
 
@@ -439,6 +484,8 @@ def main():
 
 if __name__ == "__main__":
    main()
-##     print "Hello ichthys!"
-##     print "lol sup john"
-##     print "maybe poo will come too"
+#     print "Hello ichthys!"
+#     print "lol sup john"
+#     print "maybe poo will come too"
+#     wow double #'s make bright comments in np++, remove'dded em
+
