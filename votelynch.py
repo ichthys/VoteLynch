@@ -436,6 +436,7 @@ def main():
          post - (gameid)    Creates a new vote in the current stage of the game
          # by default adds all alive players, moderators can remove from the manage page
          #redirects to /managevote/?vote=<voteid>
+         """
 
 
       ('/managevote', CreateVotePage),
