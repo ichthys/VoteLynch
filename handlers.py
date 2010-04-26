@@ -1,6 +1,6 @@
 class BaseRequestHandler(webapp.RequestHandler):
    """Supplies a common template generation function.
-
+   
    When you call generate(), we augment the template variables supplied with
    the current user in the 'user' variable and the current webapp request
    in the 'request' variable.
@@ -69,25 +69,27 @@ class CreateGameAction(BaseRequestHandler):
    @login_required
    def post(self):
       user = users.GetCurrentuser()
+      
+      # Name and password for game
       name = self.request.get('name')
       password = self.request.get('password')
-
-      if not user or not name or not pasword:
+      
+      if not user or not name or not password:
          self.error(403)
          return
-
+      
       password_hash = md5(MMSALT+password)
-
+      
       game = Game(name=name, password_hash = password_hash)
       game.put()
-
+      
       game_moderator = GameModerator(game=game, user=user)
       game_moderator.put()
-
+      
       if self.request.get('next'):
          self.redirect(self.request.get('next'))
       else:
-         self.redirect('/manage?game=' + str(game.key()))
+         self.redirect('/managegame?game=' + str(game.key()))
 
 class ManageGamePage(BaseRequestHandler):
    """url: /managegame?game=<gameid>
@@ -102,24 +104,33 @@ class ManageGamePage(BaseRequestHandler):
          Template variables:
             list_of_stages
             list_of_votes (for current stage)
-            currentstage
+            current_stage
    """
    @login_required
    def get(self):
       game = Game.get(self.request.get('game'))
-
+      
       if not game:
          self.error(403)         # game does not exist
          return
-
+      
       if not game.current_user_moderating():
          self.error(403)
          return
-
+      
       list_of_stages = game.stages
-      currentstage = Stage.get(game.currentStage)
-
-      list_of_votes = currentstage.votes
+      if game.currentStage:
+         current_stage = Stage.get(game.currentStage)
+         list_of_votes = currentstage.votes
+      else:
+         current_stage = None
+         list_of_votes = []
+      
+      self.generate('managegame.html', {
+         'list_of_stages': list_of_stages,
+         'list_of_votes': list_of_votes,
+         'current_stage': current_stage, #potentially NULL
+         })
 
 
 class CreateStageAction(BaseRequestHandler):
@@ -132,10 +143,45 @@ class CreateStageAction(BaseRequestHandler):
             Creates new stage and new StageGamePlayer relationships for each player
             redirects to /managestage?stage=<stageid>
    """
-   pass
-
+   @login_required
+   def post(self):
+      game = Game.get(self.request.get('game'))
+      
+      if not game:
+         self.error(403)         # game does not exist
+         return
+      
+      if not game.current_user_moderating():
+         self.error(403)
+         return
+      
+      #need the currentStage for index and day/night swap
+      if game.currentStage:
+         current_stage = game.currentStage
+         new_stage = Stage(index = current_stage.index + 1, game = game)
+         new_stage.isDay = not current_stage.isDay
+         for player in current_stage.StageGamePlayer_set:
+            #copy values from previous StageGamePlayer relationships
+            new_player = StageGamePlayer(stage = new_stage,
+                                         player = player.player,
+                                         isAlive = player.isAlive)
+            new_player.put()
+            
+      else:
+         new_stage = Stage(index = 0, game = game, isDay = True)
+         for player in game.GamePlayer_set:
+            #create values from players in game
+            new_player = StageGamePlayer(stage = new_stage,
+                                         player = player,
+                                         isALive = True)
+            new_player.put()
+      
+      new_stage.put()
+      
+      self.redirect('/managestage?stage=' + str(new_stage.key()))
+      
 class ManageStagePage(BaseRequestHandler):
-   """url: /managestage?game=<gameid>
+   """url: /managestage?stage=<stage>
          Page to start/manage stage of the game.
 
          createstage.do redirects here after creating a new stage
@@ -152,8 +198,7 @@ class ManageStagePage(BaseRequestHandler):
 
          Template Variables:
             list_of_stagegameplayers
-            is_day (1 = day, 0 = night - defaults to correct value)
-
+            stage
 
          NOTE: This page may be deemed redundant. This information can all be on the
           manage game page. Moderator creates a new stage. All players are copied over
@@ -161,7 +206,26 @@ class ManageStagePage(BaseRequestHandler):
           be alive. For now we'll leave these as seperate pages and merge them at a
           later time
    """
-   pass
+   @login_required
+   def get(self):
+      stage = Stage.get(self.request.get('stage'))
+      
+      if not stage:
+         self.error(403)         # stage does not exist
+         return
+      
+      game = stage.game
+      
+      if not game.current_user_moderating():
+         self.error(403)
+         return
+      
+      list_of_stagegameplayers = [p for p in stage.StageGamePlayers_set]
+                  
+      self.generate('managestage.html', {
+         'list_of_stagegameplayers': list_of_stagegameplayers,
+         'stage': stage
+         })
 
 class CreateVoteAction(BaseRequestHandler):
    """POST action to create a vote
