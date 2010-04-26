@@ -34,322 +34,12 @@ template.register_template_library('templatefilters')
 # Set to true if we want to have our webapp print stack traces, etc
 _DEBUG = True
 
-
-# forward declarations (redefined later)
-class Game(db.Model):
-   pass
-class Vote(db.Model):
-   pass
-
-
-class Stage(db.Model):
-   """Base class for days&nights
-
-   Properties
-     index: 0,1,2,... ordered index of stage
-     game: related game
-
-     players: implicit - list of players in stage (PlayerStage)
-   """
-
-   index = db.IntegerProperty()
-   game = db.Reference(Game)
-   currentvote = db.Reference(Vote)
-
-class Day(Stage):
-   """Storage for a day of a game
-
-   Properties
-     votes: implicit - list of votes
-   """
-   pass
-
-class Night(Stage):
-   """Storage for a day of a game
-
-   Properties
-   ...
-
-   """
-   pass
-
-
-class Game(db.Model):
-   """Storage for a game
-
-   Properties
-      name: Name of game
-      creator: User who created the game
-      created: datetime the game was created
-      updated: datetime the game was updated
-      published: Game is in play
-      archived: Game over
-      currentStage: current stage
-
-      players: implicit - List of players participating
-      stages: implicit - List of stages(days&nights)
-   """
-   name = db.StringProperty(required=True)
-   currentStage = db.Reference(Stage)
-
-   created = db.DateTimeProperty(auto_now_add=True)
-   updated = db.DateTimeProperty(auto_now=True)
-   archived = db.BooleanProperty(default=False)
-   published = db.BooleanProperty(default=False)
-   locked = db.BooleanProperty(default=False)
-
-   @staticmethod
-   def get_current_user_games_moderating():
-      """Returns the games that the current user has moderator access"""
-      return Game.get_user_games_moderating(users.GetCurrentUser())
-
-   @staticmethod
-   def get_user_games_moderating(user):
-      """Returns the games that the given user has moderator access"""
-      if not user: return []
-      moderating = db.Query(GameModerator).filter('user =', user)
-      return [m.game for m in moderating]
-
-   @staticmethod
-   def get_current_user_games_playing():
-      """Returns the games that the current user has joined"""
-      return Game.get_user_games_playing(users.GetCurrentUser())
-
-   @staticmethod
-   def get_user_games_playing(user):
-      """Returns the games that the given user has joined"""
-      if not user: return []
-      playing = db.Query(GamePlayer).filter('user =', user)
-      return [p.game for p in playing]
-
-   def current_user_moderating(self):
-      """Returns true if the current user has moderator access to this game."""
-      return self.user_moderating(users.GetCurrentUser())
-
-   def user_moderating(self, user):
-      """Returns true if the given user has moderator acces to this game."""
-      if not user: return False
-      query = db.Query(GameModerator)
-      query.filter('game =', self)
-      query.filter('user =', user)
-      return query.get()
-
-   def current_user_playing(self):
-      """Returns true if the current user has joined this game"""
-      return self.user_playing(users.GetCurrentUser())
-
-   def user_playing(self, user):
-      """Returns true if the given user has joined this game"""
-      if not user:
-         return False
-      query = db.Query(GamePlayer)
-      query.filter('game =', self)
-      query.filter('user =', user)
-      return query.get()
-
-class GamePlayer(db.Model):
-   """Represents the many-to-many relationship between Games and Users
-
-   Game Player ACL
-
-   Properties
-     user: related user
-     game: related game
-   """
-   user = db.UserProperty(required=True)
-   game = db.Reference(Game,required=True)
-
-class GameModerator(db.Model):
-   """Represents the many-to-nany relationship between Games and Users
-
-   Game Moderator ACL
-
-   Properties
-     user: related user
-     game: related game
-   """
-   user = db.UserProperty(required=True)
-   game = db.Reference(Game,required=True)
-
-class StageGamePlayer(db.Model):
-   """Represents the many-to-many relationship between Stages and GamePlayers
-
-   Properties
-        player: related player
-        stage: related stage
-   """
-   stage = db.Reference(Stage, required=True)
-   player = db.Reference(GamePlayer, required=True)
-
-   alive = db.BooleanProperty(required=True, default=False)
-
-
-class Vote(db.Model):
-   """
-    This is the vote class (like a poll).
-    Properties
-        day: related day(stage)
-
-        StageGamePlayers: indirect - players in stage (get from Stage)
-
-     """
-   name = db.StringProperty()
-   created = db.DateTimeProperty(auto_now_add=True)
-   updated = db.DateTimeProperty(auto_now=True)
-   archived = db.BooleanProperty(default=False)
-   published = db.BooleanProperty(default=False)
-
-   day = db.Reference(Day)
-   index = db.IntegerProperty()
-
-class VoteGamePlayer(db.Model):
-   """Represend the many-to-many relationship between Votes and Players
-   """
-   choice = db.Reference(StageGamePlayer, required=True)
-   player = db.Reference(GamePlayer, required=True)
-   vote = db.Reference(Vote, required=True)
-
-class BaseRequestHandler(webapp.RequestHandler):
-   """Supplies a common template generation function.
-
-   When you call generate(), we augment the template variables supplied with
-   the current user in the 'user' variable and the current webapp request
-   in the 'request' variable.
-   """
-   def generate(self, template_name, template_values={}):
-      values = {
-            'request': self.request,
-            'user': users.GetCurrentUser(),
-            'login_url': users.CreateLoginURL(self.request.uri),
-            'logout_url': users.CreateLogoutURL('http://' + self.request.host + '/'),
-            'debug': self.request.get('deb'),
-            'application_name': 'VoteLynch',
-         }
-      values.update(template_values)
-      directory = os.path.dirname(__file__)
-      path = os.path.join(directory, os.path.join('templates', template_name))
-      self.response.out.write(template.render(path, values, debug=_DEBUG))
-
-class MainPage(BaseRequestHandler):
-   """Lists the games moderating and playing for the current user."""
-   @login_required
-   def get(self):
-      games_playing = Game.get_current_user_games_playing()
-      games_moderating = Game.get_current_user_games_moderating()
-      show_archive = self.request.get('archive')
-      if not show_archive:    # get only non archived games
-         non_archived = []
-         for game in games_playing:
-            if not game.archived:
-               non_archived.append(game)
-         games_playing = non_archived
-         non_archived = []
-         for game in games_moderating:
-            if not game.archived:
-               non_archived.append(game)
-         games_moderating = non_archived
-      self.generate('index.html', {
-         'games_playing': games_playing,
-         'games_moderating': games_moderating,
-         'archive': show_archive,
-         })
-
-class CreateGamePage(BaseRequestHandler):
-   """Page to create a new game
-   """
-
-   @login_required
-   def get(self):
-      self.generate('create.html', {})
-
-class CreateGameAction(BaseRequestHandler):
-   """Creates a new game
-
-      Recieves (name,password) from post
-      creates game - redirects to /managegame/?game=<newgameid>
-   """
-   def post(self):
-      user = users.GetCurrentuser()
-      name = self.request.get('name')
-
-      if not user or not name:
-         self.error(403)
-         return
-
-      game = Game(name=name)
-      game.put()
-
-      game_moderator = GameModerator(game=game, user=user)
-      game_moderator.put()
-
-      if self.request.get('next'):
-         self.redirect(self.request.get('next'))
-      else:
-         self.redirect('/manage?id' + str(game.key()))
-
-class ManageGamePage(BaseRequestHandler):
-   """Page to show the moderator status of game, progress to new stage or create votes
-     for current stage"""
-
-   def get(self):
-      game = Game.get(self.request.get('id'))
-
-      if not game:
-         self.error(403)         # game does not exist
-         return
-
-      if not game.current_user_moderating():
-         pass
-
-
-class CreateStageAction(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class ManageStagePage(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class CreateVoteAction(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class ManageVotePage(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class OpenVoteAction(BaseRequestHandler):
-   """place holder"""
-   pass
-
-class CloseVoteAction(BaseRequestHandler):
-   """place holder"""
-   pass
-
-class JoinGamePage(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class JoinGameAction(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class PlayGamePage(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class VotePage(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class CastVoteAction(BaseRequestHandler):
-   """placeholder"""
-   pass
-
-class  AddModeratorAction(BaseRequestHandler):
-   """placeholder"""
-   pass
-
+# Salt value for password hash value generation
+MMSALT = "a8b8d8e8t8g"
+
+#import from external py files
+from handlers import *
+from models import *
 
 def main():
    application = webapp.WSGIApplication([
@@ -357,11 +47,12 @@ def main():
          """Display games moderating and participaing.
 
          Links:
-            create game
+            create game (/creategame)
 
          Template variables:
             list_of_games_playing
             list_of_games_moderating
+            archive (flag if archives are being displayed)
          """
 
       ('/creategame', CreateGamePage),
@@ -381,18 +72,18 @@ def main():
 
          Handler:
             Creates new game
-            Redirects to /managegame/?game=<newgameid>
+            Redirects to /managegame?game=<newgameid>
          """
 
       ('/managegame', ManageGamePage),
-         """url: /managegame/?game=<gameid>
+         """url: /managegame?game=<gameid>
          Displays state of game to moderator.
           List of GameStagePlayers and isAlive status
 
          Links:
-            Create vote (/createvote/?game=<gameid>)
-            Next stage (/createstage/?game=<gameid>)
-            Linkes for template variable data
+            Create vote (/createvote?game=<gameid>)
+            Next stage (/createstage?game=<gameid>)
+            Links for template variable data (see below)
 
          Template variables:
             list_of_stages
@@ -407,11 +98,11 @@ def main():
 
          Handler:
             Creates new stage and new StageGamePlayer relationships for each player
-            redirects to /managestage/?stage=<stageid>
+            redirects to /managestage?stage=<stageid>
          """
 
       ('/managestage', ManageStagePage),
-         """url: /managestage/?game=<gameid>
+         """url: /managestage?game=<gameid>
          Page to start/manage stage of the game.
 
          createstage.do redirects here after creating a new stage
@@ -439,24 +130,23 @@ def main():
          """
       ('/createvote.do', CreateVoteAction),
          """POST action to create a vote
-         url: /createvote.do/?game=<gameid>
+         url: /createvote.do?game=<gameid>
 
          Creates a new vote in the current stage of the game
          by default adds all alive players, moderators can remove from the manage page
-         redirects to /managevote/?vote=<voteid>
+         redirects to /managevote?vote=<voteid>
          """
 
       ('/managevote', ManageVotePage),
-         """ url: /managevote/?vote=<voteid>
+         """ url: /managevote?vote=<voteid>
 
          Page for moderator to manage vote
          Allows moderator to open and close voting
 
          Links/Buttons:
-            Open - /openvote.do/?vote=<voteid>
-            Close - /closevote.do/?vote=<voteid>
-            End - /endvote.do/?vote=<voteid>
-            Back to /managegame/?game=<gameid>
+            Open - /openvote.do?vote=<voteid>
+            Close - /closevote.do?vote=<voteid>
+            End - /endvote.do?vote=<voteid>
 
          Template variables:
             list_of_gamestageplayers - should show who they voted for
@@ -471,18 +161,18 @@ def main():
          """
 
       ('/openvote.do', OpenVoteAction),
-         """ url: /openvote.do/?vote=<voteid>
+         """ url: /openvote.do?vote=<voteid>
 
          Opens vote for players to cast their choice
          """
       ('/closevote.do', CloseVoteAction),
-         """ url: /closevote.do/?vote=<voteid>
+         """ url: /closevote.do?vote=<voteid>
 
          Closes vote so players cannot vote
          """
 
       ('/join', JoinGamePage),
-         """/join/?game=<gameid>
+         """/join?game=<gameid>
 
          Page for players to join the game. They will need the url from the moderator and the password
          They choose their alias to use for the game. (perhaps default to last used alias)
@@ -505,31 +195,48 @@ def main():
             password
             game
 
-         redirects to /play/?game=<gameid>
+         redirects to /play?game=<gameid>
          """
 
       ('/play', PlayGamePage),
-         #Page to display state of game to players
-         #Just a live list and links to active any votes
-
-         #information
-            #currentstage
-            #list_of_live_stagegameplayers, list_of_votes
-
-
+         """
+         Page to display state of game to players
+         Just a live list and links to active votes
+         
+         Template variables:
+            currentstage
+            list_of_live_stagegameplayers
+            list_of_votes
+         """
+         
       ('/vote', VotePage),
-         #/vote/?vote=<voteid>
-         #Players view vote options to vote, or voting results
-         #list_of_gamestageplayers
-
+         """url: /vote?vote=<voteid>
+         
+         Players view vote options to vote, or voting results
+         
+         Template variables:
+            list_of_gamestageplayers
+            vote_cast (set if player has already voted, should be selected on the page)
+         """
 
       ('/castvote.do', CastVoteAction),
-         #post - (vote, choice)
-            #choice is an id from list_of_gamestageplayers
+         """Post action to cast a vote
+         
+         Post fields:
+            vote (id of the vote)
+            choice (players choice - choice is an id from list_of_gamestageplayers)
+            
+         """
 
       ('/addmoderator.do', AddModeratorAction),
-         #post - (email, game)
-         #moderator supplies email of user to add
+         """ Post action to add a moderator to a game
+            Moderator supplies email of user to add
+         
+         Post fields:
+            email
+            game
+         """
+         
       ], debug=_DEBUG)
    wsgiref.handlers.CGIHandler().run(application)
 
