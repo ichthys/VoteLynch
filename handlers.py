@@ -227,6 +227,55 @@ class ManageStagePage(BaseRequestHandler):
          'stage': stage
          })
 
+class ManageStageAction(BaseRequestHandler):
+   """ url: /managestage.do
+   
+         POST action to update stage (selecting alive players)
+   """
+   pass
+
+class KillPlayerAction(BaseRequestHandler):
+   """
+      url: /killplayer.do?player=<StageGamePlayer_id>
+      
+         sets a players isAlive to False
+   """
+   @login_required
+   def post(self):
+      player = StageGamePlayer.get(self.request.get('player'))
+      
+      if not player:
+         self.error(403)
+         return
+      
+      if not player.stage.game.current_user_moderating():
+         self.error(403)
+         return
+      
+      player.isAlive = False
+      player.put()
+
+class RevivePlayerAction(BaseRequestHandler):
+   """
+      url: /reviveplayer.do?player=<StageGamePlayer_id>
+      
+         sets a players isAlive to True
+   """
+   @login_required
+   def post(self):
+      player = StageGamePlayer.get(self.request.get('player'))
+      
+      if not player:
+         self.error(403)
+         return
+      
+      if not player.stage.game.current_user_moderating():
+         self.error(403)
+         return
+      
+      player.isAlive = True
+      player.put()
+
 class CreateVoteAction(BaseRequestHandler):
    """POST action to create a vote
          url: /createvote.do?game=<gameid>
