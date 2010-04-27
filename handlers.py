@@ -94,7 +94,7 @@ class CreateGameAction(BaseRequestHandler):
 class ManageGamePage(BaseRequestHandler):
    """url: /managegame?game=<gameid>
          Displays state of game to moderator.
-          List of GameStagePlayers and isAlive status
+          List of stagegameplayers and isAlive status
 
          Links:
             Create vote (/createvote?game=<gameid>)
@@ -284,7 +284,35 @@ class CreateVoteAction(BaseRequestHandler):
          by default adds all alive players, moderators can remove from the manage page
          redirects to /managevote?vote=<voteid>
    """
-   pass
+   @login_required
+   def post(self):
+      game = Game.get(self.request.get('game'))
+      
+      if not game:
+         self.error(403)         # game does not exist
+         return
+      
+      if not game.current_user_moderating():
+         self.error(403)
+         return
+      
+      #need the currentStage to add vote to
+      if not game.currentStage:
+         self.error(403)
+         return
+      
+      
+      current_stage = game.currentStage
+      
+      if current_stage.currentVote:
+         index = current_stage.currentVote.index + 1
+      else:
+         index = 0
+         
+      new_vote = Vote(stage = current_stage, index = index)
+      
+      new_vote.put()
+      self.redirect('/managevote?vote=' + str(new_vote.key()))
 
 class ManageVotePage(BaseRequestHandler):
    """ url: /managevote?vote=<voteid>
@@ -298,7 +326,7 @@ class ManageVotePage(BaseRequestHandler):
             End - /endvote.do?vote=<voteid>
 
          Template variables:
-            list_of_gamestageplayers - should show who they voted for
+            list_of_stagegameplayers - should show who they voted for
 
             created
             updated
@@ -308,21 +336,72 @@ class ManageVotePage(BaseRequestHandler):
             day_index
             vote_index
    """
-   pass
+   @login_required
+   def get(self):
+      vote = Vote.get(self.request.get('vote'))
+      
+      if not vote:
+         self.error(403)
+         return
+         
+      if not vote.stage.game.current_user_moderating():
+         self.error(403)
+         return
+      
+      list_of_stagegameplayers = vote.stage.players
+      
+      self.generate('managevote.html', {
+         'list_of_stagegameplayers': list_of_stages,
+         'vote': vote,
+         'stage': vote.stage,
+         'game': vote.stage.game,
+         })
 
 class OpenVoteAction(BaseRequestHandler):
    """ url: /openvote.do?vote=<voteid>
 
          Opens vote for players to cast their choice
    """
-   pass
+   @login_required
+   def post(self):
+      vote = Vote.get(self.request.get('vote'))
+      
+      if not vote:
+         self.error(403)
+         return
+      
+      if not vote.stage.game.current_user_moderating():
+         self.error(403)
+         return
+      
+      vote.isOpen = True
+      vote.put()
+      
+      if self.request.get('next'):
+         self.redirect(self.request.get('next'))
 
 class CloseVoteAction(BaseRequestHandler):
    """ url: /closevote.do?vote=<voteid>
 
          Closes vote so players cannot vote
    """
-   pass
+   @login_required
+   def post(self):
+      vote = Vote.get(self.request.get('vote'))
+      
+      if not vote:
+         self.error(403)
+         return
+      
+      if not vote.stage.game.current_user_moderating():
+         self.error(403)
+         return
+      
+      vote.isOpen = False
+      vote.put()
+      
+      if self.request.get('next'):
+         self.redirect(self.request.get('next'))
 
 class JoinGamePage(BaseRequestHandler):
    """/join?game=<gameid>
@@ -339,9 +418,25 @@ class JoinGamePage(BaseRequestHandler):
 
          Template variables:
             game_name
-            alias (users most recently used alias)
+            #alias (users most recently used alias)
    """
-   pass
+   
+   @login_required
+   def get(self):
+      game = Game.get(self.request.get('game'))
+      
+      if not game:
+         self.error(403)         # game does not exist
+         return
+      
+      #Check if user is already in the game
+      user = users.GetCurrentUser()
+      if user in game.players:
+         self.redirect('/play?game=' + str(game.key()))
+      
+      self.generate('joingame.html', {
+         'game_name': game.name,
+         })
 
 class JoinGameAction(BaseRequestHandler):
    """ POST action to join a game
@@ -353,19 +448,78 @@ class JoinGameAction(BaseRequestHandler):
 
          redirects to /play?game=<gameid>
    """
-   pass
+   @login_required
+   def post(self):
+      game = Game.get(self.request.get('game'))
+      
+      if not game:
+         self.error(403)         # game does not exist
+         return
+      
+      #Check if user is already in the game
+      user = users.GetCurrentUser()
+      if user in game.players:
+         self.redirect('/play?game=' + str(game.key()))
+      
+      alias = self.request.get('alias')
+      # Need to introduce some alias input checks here
+      if not alias:
+         self.error(403)
+         return
+      
+      password = self.request.get('password')
+      if (md5(MMSALT+password) != game.password_hash):
+         self.error(403)
+         return
+      
+      new_gameplayer = GamePlayer(user = user, game = game)
+      new_gameplayer.put()
+      
+      self.redirect('/play?game=' + str(game.key()))
+
 
 class PlayGamePage(BaseRequestHandler):
    """
+      url:/play?game=<gameid>
+      
          Page to display state of game to players
          Just a live list and links to active votes
 
          Template variables:
-            currentstage
+            current_stage
             list_of_live_stagegameplayers
+            list_of_dead_stagegameplayers
             list_of_votes
    """
-   pass
+   @login_required
+   def get(self):
+      game = Game.get(self.request.get('game'))
+      
+      if not game:
+         self.error(403)
+         return
+         
+      user = users.GetCurrentUser()
+      
+      # User needs to join game
+      if user not in game.players:
+         self.redirect('/joingame?game=' + str(game.key())
+      
+      list_of_live_stagegameplayers = []
+      list_of_dead_stagegameplayers = []
+      
+      for player in game.players:
+         if player.isAlive:
+            list_of_live_stagegameplayers.append(player)
+         else:
+            list_of_dead_stagegameplayers.append(player)
+      
+      self.generate('play.html', {
+         'current_stage': game.currentStage,
+         'list_of_live_stagegameplayers': list_of_live_stagegameplayers,
+         'list_of_dead_stagegameplayers': list_of_dead_stagegameplayers,
+         'list_of_votes': game.currentStage.votes,
+         })
 
 class VotePage(BaseRequestHandler):
    """url: /vote?vote=<voteid>
@@ -373,17 +527,37 @@ class VotePage(BaseRequestHandler):
          Players view vote options to vote, or voting results
 
          Template variables:
-            list_of_gamestageplayers
+            list_of_live_stagegameplayers
             vote_cast (set if player has already voted, should be selected on the page)
    """
-   pass
+   @login_required
+   def get(self):
+      vote = Vote.get(self.request.get('vote'))
+      
+      if not vote:
+         self.error(403)
+         return
+      
+      user = users.GetCurrentUser()
+      
+      # User is not in game
+      if not any(p for p in vote.stage.players if p.player.user == user):
+         self.error(403)
+         return
+      
+      list_of_live_stagegameplayers = vote.game.players.filter('isAlive =', True)
+      
+      self.generate('vote.html', {
+         'list_of_live_stagegameplayers': list_of_live_stagegameplayers,
+         'vote_cast': 
+      })
 
 class CastVoteAction(BaseRequestHandler):
    """Post action to cast a vote
 
          Post fields:
             vote (id of the vote)
-            choice (players choice - choice is an id from list_of_gamestageplayers)
+            choice (players choice - choice is an id from list_of_stagegameplayers)
 
    """
    pass

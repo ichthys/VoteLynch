@@ -12,13 +12,14 @@ class Stage(db.Model):
      index: 0,1,2,... ordered index of stage
      game: related game
 
-     players: implicit - list of players in stage (PlayerStage)
+     players: implicit - list of players in stage (StageGamePlayer)
+     votes: implicit - list of votes in the stage (Vote)
    """
    
    index = db.IntegerProperty()
    isDay = db.BooleanProperty()
    game = db.ReferenceProperty(Game, collection_name="stages")
-   currentvote = db.ReferenceProperty(Vote)
+   currentVote = db.ReferenceProperty(Vote)
 
 class Game(db.Model):
    """Storage for a game
@@ -125,7 +126,8 @@ class StageGamePlayer(db.Model):
         player: related player
         stage: related stage
    """
-   stage = db.ReferenceProperty(Stage, required=True)
+   stage = db.ReferenceProperty(Stage, required=True,
+                                 collection_name = 'players')
    player = db.ReferenceProperty(GamePlayer, required=True)
    
    isAlive = db.BooleanProperty(required=True, default=False)
@@ -145,8 +147,9 @@ class Vote(db.Model):
    updated = db.DateTimeProperty(auto_now=True)
    archived = db.BooleanProperty(default=False)
    published = db.BooleanProperty(default=False)
+   isOpen = db.BooleanProperty(default=True)
    
-   day = db.ReferenceProperty(Day, collection_name="votes")
+   stage = db.ReferenceProperty(Stage, collection_name="votes")
    index = db.IntegerProperty()
 
 class VoteGamePlayer(db.Model):
