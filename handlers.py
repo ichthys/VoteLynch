@@ -540,16 +540,22 @@ class VotePage(BaseRequestHandler):
       
       user = users.GetCurrentUser()
       
-      # User is not in game
-      if not any(p for p in vote.stage.players if p.player.user == user):
+      list_of_live_stagegameplayers = vote.stage.players.filter('isAlive =', True)
+      
+      stagegameplayer = \
+         next((p for p in list_of_live_stagegameplayers if p.player.user == user),
+               None)
+      
+      # User is not in game and alive
+      if not stagegameplayer:
          self.error(403)
          return
       
-      list_of_live_stagegameplayers = vote.game.players.filter('isAlive =', True)
+      choice = vote.choices.filter('player =', stagegameplayer.player).choice
       
       self.generate('vote.html', {
          'list_of_live_stagegameplayers': list_of_live_stagegameplayers,
-         'vote_cast': 
+         'vote_cast': choice,
       })
 
 class CastVoteAction(BaseRequestHandler):

@@ -157,4 +157,5 @@ class VoteGamePlayer(db.Model):
    """
    choice = db.ReferenceProperty(StageGamePlayer, required=True)
    player = db.ReferenceProperty(GamePlayer, required=True)
-   vote = db.ReferenceProperty(Vote, required=True)   
+   vote = db.ReferenceProperty(Vote, required=True,
+            collection_name = 'choices')
