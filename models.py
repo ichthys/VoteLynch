@@ -155,7 +155,6 @@ class Vote(db.Model):
 class VoteGamePlayer(db.Model):
    """Represents the many-to-many relationship between Votes and Players
    """
-   choice = db.ReferenceProperty(StageGamePlayer, required=True)
-   player = db.ReferenceProperty(GamePlayer, required=True)
-   vote = db.ReferenceProperty(Vote, required=True,
-            collection_name = 'choices')
+   choice = db.ReferenceProperty(StageGamePlayer)
+   player = db.ReferenceProperty(GamePlayer)
+   vote = db.ReferenceProperty(Vote, collection_name = 'choices')

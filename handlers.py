@@ -566,7 +566,48 @@ class CastVoteAction(BaseRequestHandler):
             choice (players choice - choice is an id from list_of_stagegameplayers)
 
    """
-   pass
+   @login_required
+   def post(self):
+      vote = Vote.get(self.request.get('vote'))
+      
+      if not vote:
+         self.error(403)
+         return
+      
+      stage = vote.stage
+      game = stage.game
+      
+      user = users.GetCurrentUser()
+      
+      stage_game_player = \
+         next(p for p in stage.players if p.player.user == user), None)
+      
+      if not stage_game_player or not stage_game_player.isAlive:
+         # player is not in stage or not alive
+         self.error(403)
+         return
+      
+      choice = StageGamePlayer(self.request.get('choice'))
+      
+      if not choice or not choice.isAlive:
+         self.error(403)
+         return
+      
+      if choice not in stage.players:
+         self.error(403)
+         return
+      
+      
+      vote_game_player = \
+         next(p for p in vote.choices if p.player.user == user), None)
+      # player has not previously voted in this vote
+      if not vote_game_player:
+         vote_game_player = VoteGamePlayer()
+         vote_game_player.vote = vote
+         vote_game_player.player = stage_game_player.player
+      
+      vote_game_player.choice = choice
+      vote_game_player.put()
 
 class  AddModeratorAction(BaseRequestHandler):
    """ Post action to add a moderator to a game
@@ -576,4 +617,24 @@ class  AddModeratorAction(BaseRequestHandler):
             email
             game
    """
-   pass
+   @login_required
+   def post(self):
+      game = self.request.get('game')
+      email = self.request.get('email')
+      if not game or not email:
+         self.error(403)
+         return
+
+       # Validate this user has access to this task list
+      if not game.current_user_has_access():
+         self.error(403)
+         return
+
+      # Don't duplicate entries in the permissions datastore
+      user = users.User(email)
+      if not game.user_moderating(user):
+         moderator = GameModerator(user=user, game = game)
+         moderator.put()
+      
+      if self.request.get('next'):
+         self.redirect(self.request.get('next'))
