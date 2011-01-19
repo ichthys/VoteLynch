@@ -1,3 +1,14 @@
+from google.appengine.ext.webapp.util import login_required
+from google.appengine.api import users
+from google.appengine.ext import db
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp import template
+import os
+
+from models import Game
+from votelynch import _DEBUG
+
+
 class BaseRequestHandler(webapp.RequestHandler):
    """Supplies a common template generation function.
    
@@ -503,7 +514,7 @@ class PlayGamePage(BaseRequestHandler):
       
       # User needs to join game
       if user not in game.players:
-         self.redirect('/joingame?game=' + str(game.key())
+         self.redirect('/joingame?game=' + str(game.key()))
       
       list_of_live_stagegameplayers = []
       list_of_dead_stagegameplayers = []
@@ -579,8 +590,7 @@ class CastVoteAction(BaseRequestHandler):
       
       user = users.GetCurrentUser()
       
-      stage_game_player = \
-         next(p for p in stage.players if p.player.user == user), None)
+      stage_game_player = next(p for p in stage.players if p.player.user == user), None
       
       if not stage_game_player or not stage_game_player.isAlive:
          # player is not in stage or not alive
@@ -598,8 +608,7 @@ class CastVoteAction(BaseRequestHandler):
          return
       
       
-      vote_game_player = \
-         next(p for p in vote.choices if p.player.user == user), None)
+      vote_game_player = next(p for p in vote.choices if p.player.user == user), None
       # player has not previously voted in this vote
       if not vote_game_player:
          vote_game_player = VoteGamePlayer()
